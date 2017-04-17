@@ -23,6 +23,12 @@ to run it by yourself.
 + `REMAILME_APP_ID`: reddit's app client id.
 + `REMAILME_APP_SECRET`: reddit's app client secret.
 
+# How does it look like
+
+Screenshot of newsletter from r/programming:
+
+![reddit-weekly](http://i.imgur.com/QEyqKYs.png)
+
 # License
 
 This project is licensed under the MIT license. See LICENSE.
