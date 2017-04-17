@@ -35,8 +35,6 @@ def weekly_page(subreddit, file, css=None):
     if isinstance(file, str):
         with open(file, 'w', encoding='utf-8') as f:
             return weekly_page(subreddit, file=f, css=css)
-
-
     
     r = requests.get(f"https://www.reddit.com/r/{subreddit}/top/?sort=top&t=week",
                      headers=HEADERS)
@@ -90,15 +88,14 @@ def weekly_page(subreddit, file, css=None):
 
     file.write('</html>')
 
-
-def send_email(subject, toaddr, message):
+def send_email(subject, to, message):
     fromaddr = os.environ['REMAILME_SENDER']
     frompass = os.environ['REMAILME_PASS']
 
     msg = MIMEMultipart('alternative')
     msg['Subject'] = Header(subject, 'utf-8')
     msg['From'] = fromaddr
-    msg['To'] = toaddr
+    msg['To'] = to
 
     msg.attach(MIMEText('Weekly Subreddit', 'plain'))
     msg.attach(MIMEText(message, 'html'))
@@ -108,7 +105,7 @@ def send_email(subject, toaddr, message):
         server.starttls()
         server.ehlo()
         server.login(fromaddr, frompass)
-        server.sendmail(fromaddr, [toaddr], msg.as_string())
+        server.sendmail(fromaddr, [to], msg.as_string())
 
 def user_subreddits(token):
     reddit = praw.Reddit(client_id=os.environ['REMAILME_APP_ID'],
@@ -119,15 +116,15 @@ def user_subreddits(token):
 
 def send_newsletter(token, email):
     for subreddit in user_subreddits(token):
-        subreddit = str(subreddit)
+        subreddit = subreddit.display_name
         with io.StringIO() as body:
             print(f"Sending {subreddit} weekly for {email}...")
             weekly_page(subreddit, body, css='css/reddit.css')
             email_body = Premailer(body.getvalue(),
                                    base_url='https://www.reddit.com',
                                    disable_leftover_css=True).transform()
-            send_email('Weekly r/' + subreddit + ' Subreddit',
-                       email, email_body)
+            send_email(subject=f'Weekly r/{subreddit} Subreddit',
+                       to=email, message=email_body)
 
 def main(filepath):
     with io.open(filepath, 'r') as file:
