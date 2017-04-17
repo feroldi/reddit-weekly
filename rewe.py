@@ -13,33 +13,83 @@ from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from argparse import ArgumentParser
+from premailer import Premailer
 
-def weekly_page(subreddit, file):
-    headers = requests.utils.default_headers()
-    headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:52.0) Gecko/20100101 Firefox/52.0'})
+HEADERS = requests.utils.default_headers()
+HEADERS.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:52.0) Gecko/20100101 Firefox/52.0'})
+
+
+def _concat_css(input_name, output):
+    with open(input_name, encoding='utf-8') as f:
+        output.write('\n<style>\n')
+        output.write(f.read())
+        output.write('\n</style>\n')
+
+def _extract_external_css(selector):
+    for p in selector.xpath("/html/head/link[@rel='stylesheet']"):
+            href = re.sub(r"^//", r"https://", p.xpath("@href").extract_first())
+            sheet = requests.get(href, headers=HEADERS).text if href else ""
+            yield sheet
+
+def weekly_page(subreddit, file, css=None):
+    if isinstance(file, str):
+        with open(file, 'w', encoding='utf-8') as f:
+            return weekly_page(subreddit, file=f, css=css)
+
+
     
     r = requests.get(f"https://www.reddit.com/r/{subreddit}/top/?sort=top&t=week",
-                     headers=headers)
+                     headers=HEADERS)
 
-    assert r.status_code == 200
-    assert r.encoding.lower() == 'utf-8'
+    if r.status_code != 200:
+        raise RuntimeError(f"Request status code is {r.status_code}.")
+    if r.encoding.lower() != 'utf-8':
+        raise RuntimeError(f"Request didn't return a UTF-8 output.")
 
     sel = parsel.Selector(text=r.text)
 
     file.write('<!DOCTYPE html>')
     file.write('<html>')
 
-    head = sel.xpath("/html/head").extract_first()
-    head = re.sub(r'="//', '="https://', head)
-    file.write(head)
+    if css == 1: # Download External
+        file.write('<head>')
+        file.write('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">')
+        for stylesheet in _extract_external_css(sel):
+                file.write(f'\n<style>\n')
+                file.write(stylesheet)
+                file.write('\n</style>\n')
+        file.write('</head>')
+    elif css == 2: # Keep External
+        head = sel.xpath("/html/head").extract_first()
+        head = re.sub(r'="//', '="https://', head)
+        file.write(head)
+    elif isinstance(css, str):
+        file.write('<head>')
+        file.write('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">')
+        _concat_css(css, file)
+        file.write('</head>')
+    elif isinstance(css, list):
+        file.write('<head>')
+        file.write('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">')
+        for c in css:
+            _concat_css(c, file)
+        file.write('</head>')
+    else:
+        file.write('<head>')
+        file.write('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">')
+        file.write('</head>')
 
-    file.write('<body>')
+    file.write('<body class="">')
+    file.write('<div class="content" role="main">')
     for spacer in sel.xpath("/html/body/div[@class='content']/div[@class='spacer' and style]"):
         content = spacer.extract()
         content = re.sub(r'="//', r'="https://', content)
         file.write(content)
+    file.write('</div>')
     file.write('</body>')
+
     file.write('</html>')
+
 
 def send_email(subject, toaddr, message):
     fromaddr = os.environ['REMAILME_SENDER']
@@ -71,9 +121,13 @@ def send_newsletter(token, email):
     for subreddit in user_subreddits(token):
         subreddit = str(subreddit)
         with io.StringIO() as body:
-            weekly_page(subreddit, body)
+            print(f"Sending {subreddit} weekly for {email}...")
+            weekly_page(subreddit, body, css='css/reddit.css')
+            email_body = Premailer(body.getvalue(),
+                                   base_url='https://www.reddit.com',
+                                   disable_leftover_css=True).transform()
             send_email('Weekly r/' + subreddit + ' Subreddit',
-                       email, body.getvalue())
+                       email, email_body)
 
 def main(filepath):
     with io.open(filepath, 'r') as file:
