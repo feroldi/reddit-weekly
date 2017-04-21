@@ -38,13 +38,13 @@ def weekly_page(subreddit, file, css=None):
         with open(file, 'w', encoding='utf-8') as f:
             return weekly_page(subreddit, file=f, css=css)
     
-    r = requests.get(f"https://www.reddit.com/r/{subreddit}/top/?sort=top&t=week",
+    r = requests.get("https://www.reddit.com/r/{}/top/?sort=top&t=week".format(subreddit),
                      headers=HEADERS)
 
     if r.status_code != 200:
-        raise RuntimeError(f"Request status code is {r.status_code}.")
+        raise RuntimeError("Request status code is {}.".format(r.status_code))
     if r.encoding.lower() != 'utf-8':
-        raise RuntimeError(f"Request didn't return a UTF-8 output.")
+        raise RuntimeError("Request didn't return a UTF-8 output.")
 
     sel = parsel.Selector(text=r.text)
 
@@ -55,7 +55,7 @@ def weekly_page(subreddit, file, css=None):
         file.write('<head>')
         file.write('<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">')
         for stylesheet in _extract_external_css(sel):
-                file.write(f'\n<style>\n')
+                file.write('\n<style>\n')
                 file.write(stylesheet)
                 file.write('\n</style>\n')
         file.write('</head>')
@@ -120,12 +120,12 @@ def send_newsletter(token, email):
     for subreddit in user_subreddits(token):
         subreddit = subreddit.display_name
         with io.StringIO() as body:
-            print(f"Sending {subreddit} weekly for {email}...")
+            print("Sending {} weekly for {}...".format(subreddit, email))
             weekly_page(subreddit, body, css=REDDIT_CSS)
             email_body = Premailer(body.getvalue(),
                                    base_url='https://www.reddit.com',
                                    disable_leftover_css=True).transform()
-            send_email(subject=f'Weekly r/{subreddit} Subreddit',
+            send_email(subject='Weekly r/{} Subreddit'.format(subreddit),
                        to=email, message=email_body)
 
 def main(filepath):
