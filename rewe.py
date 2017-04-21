@@ -18,6 +18,8 @@ from premailer import Premailer
 HEADERS = requests.utils.default_headers()
 HEADERS.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:52.0) Gecko/20100101 Firefox/52.0'})
 
+SCRIPT_PATH = os.path.dirname(os.path.realpath(__file__))
+REDDIT_CSS = os.path.join(SCRIPT_PATH, 'css', 'reddit.css')
 
 def _concat_css(input_name, output):
     with open(input_name, encoding='utf-8') as f:
@@ -119,7 +121,7 @@ def send_newsletter(token, email):
         subreddit = subreddit.display_name
         with io.StringIO() as body:
             print(f"Sending {subreddit} weekly for {email}...")
-            weekly_page(subreddit, body, css='css/reddit.css')
+            weekly_page(subreddit, body, css=REDDIT_CSS)
             email_body = Premailer(body.getvalue(),
                                    base_url='https://www.reddit.com',
                                    disable_leftover_css=True).transform()
