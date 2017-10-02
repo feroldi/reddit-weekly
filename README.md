@@ -43,10 +43,10 @@ Just enter with `identity,mysubreddits`.
 
 Export all variables used by the script. For example:
 
-    export REMAILME_SENDER='place sender email here'
-    export REMAILME_PASS='place sender password gere'
-    export REMAILME_APP_ID='place client id here'
-    export REMAILME_APP_SECRET='place client secret here'
+    export REWE_SENDER='place sender email here'
+    export REWE_PASS='place sender password gere'
+    export REWE_APP_ID='place client id here'
+    export REWE_APP_SECRET='place client secret here'
 
 Create a json file (let's call it `database.json`) with all the desired
 target emails (emails to send the newsletter to), and their respective refresh token.
@@ -66,10 +66,10 @@ in the json file.
 
 # Environment variables
 
-+ `REMAILME_SENDER`: sender's email.
-+ `REMAILME_PASS`: sender's email password.
-+ `REMAILME_APP_ID`: reddit's app client id.
-+ `REMAILME_APP_SECRET`: reddit's app client secret.
++ `REWE_SENDER`: sender's email.
++ `REWE_PASS`: sender's email password.
++ `REWE_APP_ID`: reddit's app client id.
++ `REWE_APP_SECRET`: reddit's app client secret.
 
 # How does it look like
 

@@ -37,7 +37,7 @@ def weekly_page(subreddit, file, css=None):
     if isinstance(file, str):
         with open(file, 'w', encoding='utf-8') as f:
             return weekly_page(subreddit, file=f, css=css)
-    
+
     r = requests.get("https://www.reddit.com/r/{}/top/?sort=top&t=week".format(subreddit),
                      headers=HEADERS)
 
@@ -91,8 +91,8 @@ def weekly_page(subreddit, file, css=None):
     file.write('</html>')
 
 def send_email(subject, to, message):
-    fromaddr = os.environ['REMAILME_SENDER']
-    frompass = os.environ['REMAILME_PASS']
+    fromaddr = os.environ['REWE_SENDER']
+    frompass = os.environ['REWE_PASS']
 
     msg = MIMEMultipart('alternative')
     msg['Subject'] = Header(subject, 'utf-8')
@@ -110,8 +110,8 @@ def send_email(subject, to, message):
         server.sendmail(fromaddr, [to], msg.as_string())
 
 def user_subreddits(token):
-    reddit = praw.Reddit(client_id=os.environ['REMAILME_APP_ID'],
-                         client_secret=os.environ['REMAILME_APP_SECRET'],
+    reddit = praw.Reddit(client_id=os.environ['REWE_APP_ID'],
+                         client_secret=os.environ['REWE_APP_SECRET'],
                          user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:52.0) Gecko/20100101 Firefox/52.0',
                          refresh_token=token)
     return reddit.user.subreddits()
@@ -125,7 +125,7 @@ def send_newsletter(token, email):
             email_body = Premailer(body.getvalue(),
                                    base_url='https://www.reddit.com',
                                    disable_leftover_css=True).transform()
-            send_email(subject='Weekly r/{} Subreddit'.format(subreddit),
+            send_email(subject='Reddit weekly r/{}'.format(subreddit),
                        to=email, message=email_body)
 
 def main(filepath):
