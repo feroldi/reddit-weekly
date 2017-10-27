@@ -139,7 +139,7 @@ def main(filepath):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('-u', '--users')
+    parser.add_argument('-u', '--users', required=True, help='load users and their tokens from a JSON file')
     opt = parser.parse_args()
     main(opt.users)
 
