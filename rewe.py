@@ -45,17 +45,17 @@ def weekly_page(subreddit, file, css=None):
         with open(file, "w", encoding="utf-8") as f:
             return weekly_page(subreddit, file=f, css=css)
 
-    r = requests.get(
-        "https://www.reddit.com/r/{}/top/?sort=top&t=week".format(subreddit),
+    response = requests.get(
+        "https://old.reddit.com/r/{}/top/?sort=top&t=day".format(subreddit),
         headers=HEADERS,
     )
 
-    if r.status_code != 200:
-        raise RuntimeError("Request status code is {}.".format(r.status_code))
-    if r.encoding.lower() != "utf-8":
+    if response.status_code != 200:
+        raise RuntimeError("Request status code is {}.".format(response.status_code))
+    if response.encoding.lower() != "utf-8":
         raise RuntimeError("Request didn't return a UTF-8 output.")
 
-    sel = parsel.Selector(text=r.text)
+    sel = parsel.Selector(text=response.text)
 
     file.write("<!DOCTYPE html>")
     file.write("<html>")
@@ -98,12 +98,14 @@ def weekly_page(subreddit, file, css=None):
 
     file.write('<body class="">')
     file.write('<div class="content" role="main">')
+
     for spacer in sel.xpath(
         "/html/body/div[@class='content']/div[@class='spacer' and style]"
     ):
         content = spacer.extract()
         content = re.sub(r'="//', r'="https://', content)
         file.write(content)
+
     file.write("</div>")
     file.write("</body>")
 
@@ -119,7 +121,7 @@ def send_email(subject, to, message):
     msg["From"] = fromaddr
     msg["To"] = to
 
-    msg.attach(MIMEText("Weekly Subreddit", "plain"))
+    msg.attach(MIMEText("Daily Subreddit", "plain"))
     msg.attach(MIMEText(message, "html"))
 
     with smtplib.SMTP(host="smtp.gmail.com", port=587) as server:
