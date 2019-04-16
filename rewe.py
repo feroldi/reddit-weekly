@@ -1,5 +1,3 @@
-#!/bin/python3
-
 import praw
 import smtplib
 import requests
@@ -8,12 +6,16 @@ import re
 import io
 import json
 import os
+import datetime
 
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from argparse import ArgumentParser
 from premailer import Premailer
+
+from prefect import task, Flow
+from prefect.client import Secret
 
 HEADERS = requests.utils.default_headers()
 HEADERS.update(
@@ -24,6 +26,21 @@ HEADERS.update(
 
 SCRIPT_PATH = os.path.dirname(os.path.realpath(__file__))
 REDDIT_CSS = os.path.join(SCRIPT_PATH, "css", "reddit.css")
+
+
+@task(name="Fetch User Subreddits")
+def user_subreddits():
+    app_id = Secret("REDDIT_DAILY_APP_ID").get()
+    app_secret = Secret("REDDIT_DAILY_APP_SECRET").get()
+    refresh_token = Secret("REDDIT_DAILY_REFRESH_TOKEN").get()
+
+    reddit = praw.Reddit(
+        client_id=app_id,
+        client_secret=app_secret,
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:52.0) Gecko/20100101 Firefox/52.0",
+        refresh_token=refresh_token,
+    )
+    return list(reddit.user.subreddits())
 
 
 def _concat_css(input_name, output):
@@ -40,10 +57,13 @@ def _extract_external_css(selector):
         yield sheet
 
 
-def weekly_page(subreddit, file, css=None):
-    if isinstance(file, str):
-        with open(file, "w", encoding="utf-8") as f:
-            return weekly_page(subreddit, file=f, css=css)
+@task(name="Extract Top Posts")
+def weekly_page(subreddit):
+    # if isinstance(file, str):
+    #     with open(file, "w", encoding="utf-8") as f:
+    #         return weekly_page(subreddit, file=f, css=css)
+    css = REDDIT_CSS
+    subreddit = subreddit.display_name
 
     response = requests.get(
         "https://old.reddit.com/r/{}/top/?sort=top&t=day".format(subreddit),
@@ -56,6 +76,8 @@ def weekly_page(subreddit, file, css=None):
         raise RuntimeError("Request didn't return a UTF-8 output.")
 
     sel = parsel.Selector(text=response.text)
+
+    file = io.StringIO()
 
     file.write("<!DOCTYPE html>")
     file.write("<html>")
@@ -111,15 +133,33 @@ def weekly_page(subreddit, file, css=None):
 
     file.write("</html>")
 
+    file.seek(0)
 
-def send_email(subject, to, message):
-    fromaddr = os.environ["REWE_SENDER"]
-    frompass = os.environ["REWE_PASS"]
+    return file
+
+
+@task(name="Format Email")
+def format_email(email_body):
+    email_body_stage_1 = Premailer(
+        email_body.getvalue(),
+        base_url="https://www.reddit.com",
+        disable_leftover_css=True,
+    )
+    email_body_stage_2 = email_body_stage_1.transform()
+    return email_body_stage_2
+
+
+# , max_retries=5, retry_delay=datetime.timedelta(minutes=5)
+@task(name="Send Email")
+def send_email(subreddit, message):
+    subject = "Reddit weekly r/{}".format(subreddit)
+    email_address = Secret("REDDIT_DAILY_EMAIL").get()
+    password = Secret("REDDIT_DAILY_EMAIL_PASSWORD").get()
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = Header(subject, "utf-8")
-    msg["From"] = fromaddr
-    msg["To"] = to
+    msg["From"] = email_address
+    msg["To"] = email_address
 
     msg.attach(MIMEText("Daily Subreddit", "plain"))
     msg.attach(MIMEText(message, "html"))
@@ -128,55 +168,13 @@ def send_email(subject, to, message):
         server.ehlo()
         server.starttls()
         server.ehlo()
-        server.login(fromaddr, frompass)
-        server.sendmail(fromaddr, [to], msg.as_string())
+        server.login(email_address, password)
+        server.sendmail(email_address, [email_address], msg.as_string())
 
 
-def user_subreddits(token):
-    reddit = praw.Reddit(
-        client_id=os.environ["REWE_APP_ID"],
-        client_secret=os.environ["REWE_APP_SECRET"],
-        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:52.0) Gecko/20100101 Firefox/52.0",
-        refresh_token=token,
-    )
-    return reddit.user.subreddits()
-
-
-def send_newsletter(token, email):
-    for subreddit in user_subreddits(token):
-        subreddit = subreddit.display_name
-        with io.StringIO() as body:
-            print("Sending {} weekly for {}...".format(subreddit, email))
-            weekly_page(subreddit, body, css=REDDIT_CSS)
-            email_body = Premailer(
-                body.getvalue(),
-                base_url="https://www.reddit.com",
-                disable_leftover_css=True,
-            ).transform()
-            send_email(
-                subject="Reddit weekly r/{}".format(subreddit),
-                to=email,
-                message=email_body,
-            )
-
-
-def main(filepath):
-    with io.open(filepath, "r") as file:
-        users = json.load(file)
-        for email in users:
-            token = users[email]
-            send_newsletter(token, email)
-
-
-# usage: python rewe.py -u, --users=<json>
-
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument(
-        "-u",
-        "--users",
-        required=True,
-        help="load users and their tokens from a JSON file",
-    )
-    opt = parser.parse_args()
-    main(opt.users)
+# user_tokens is a list of tuples made up of usernames (emails) and refresh tokens
+with Flow("Reddit Daily") as flow:
+    subreddits = user_subreddits()
+    email_bodies = weekly_page.map(subreddits)
+    formatted_email_bodies = format_email.map(email_bodies)
+    send_email.map(subreddit=subreddits, message=formatted_email_bodies)
