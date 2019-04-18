@@ -16,6 +16,7 @@ from premailer import Premailer
 
 from prefect import task, Flow
 from prefect.client import Secret
+from prefect.triggers import any_failed
 
 HEADERS = requests.utils.default_headers()
 HEADERS.update(
@@ -59,9 +60,6 @@ def _extract_external_css(selector):
 
 @task(name="Extract Top Posts")
 def weekly_page(subreddit):
-    # if isinstance(file, str):
-    #     with open(file, "w", encoding="utf-8") as f:
-    #         return weekly_page(subreddit, file=f, css=css)
     css = REDDIT_CSS
     subreddit = subreddit.display_name
 
@@ -172,9 +170,20 @@ def send_email(subreddit, message):
         server.sendmail(email_address, [email_address], msg.as_string())
 
 
-# user_tokens is a list of tuples made up of usernames (emails) and refresh tokens
+@task(name="Failure Slack Notification", trigger=any_failed)
+def send_failure_notice():
+    print("This task is a stand-in for sending a real slack message, fix it Dylan")
+
+
 with Flow("Reddit Daily") as flow:
     subreddits = user_subreddits()
     email_bodies = weekly_page.map(subreddits)
     formatted_email_bodies = format_email.map(email_bodies)
-    send_email.map(subreddit=subreddits, message=formatted_email_bodies)
+    results = send_email.map(subreddit=subreddits, message=formatted_email_bodies)
+    send_failure_notice(upstream_tasks=[results])
+    flow.set_reference_tasks([results])
+
+
+# TODO Add task that runs only if upstream tasks fail that slacks me if something broke
+# TODO Reduce the text files into one text file and email that
+

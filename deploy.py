@@ -1,6 +1,6 @@
 from prefect import Client
 from prefect.schedules import CronSchedule
-from rewe import flow
+from reddit_daily import flow
 
 c = Client()
 s = CronSchedule("0 * * * *")
