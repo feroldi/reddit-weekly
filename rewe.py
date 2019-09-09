@@ -38,7 +38,7 @@ def weekly_page(subreddit, file, css=None):
         with open(file, 'w', encoding='utf-8') as f:
             return weekly_page(subreddit, file=f, css=css)
 
-    r = requests.get("https://www.reddit.com/r/{}/top/?sort=top&t=week".format(subreddit),
+    r = requests.get("https://old.reddit.com/r/{}/top/?sort=top&t=week".format(subreddit),
                      headers=HEADERS)
 
     if r.status_code != 200:
