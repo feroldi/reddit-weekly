@@ -1,4 +1,4 @@
 parsel==1.1.0
 praw==4.4.0
 premailer==3.0.1
-requests==2.13.0
+requests==2.20.0
