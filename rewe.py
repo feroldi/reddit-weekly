@@ -112,7 +112,7 @@ def send_email(subject, to, message):
 def user_subreddits(token):
     reddit = praw.Reddit(client_id=os.environ['REWE_APP_ID'],
                          client_secret=os.environ['REWE_APP_SECRET'],
-                         user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:52.0) Gecko/20100101 Firefox/52.0',
+                         user_agent=HEADERS['User-Agent'],
                          refresh_token=token)
     return reddit.user.subreddits()
 
